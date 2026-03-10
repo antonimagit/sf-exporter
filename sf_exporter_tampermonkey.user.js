@@ -16,18 +16,16 @@
 
   // Aspetta che la pagina sia pronta, poi inietta il bottone trigger
   function waitForPage() {
-    if (document.querySelector('.data-grid-table-ctr') || document.querySelector('[aria-rowcount]')) {
-      injectTriggerButton();
-    } else {
-      // Osserva il DOM finché non appare la tabella
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('.data-grid-table-ctr') || document.querySelector('[aria-rowcount]')) {
-          observer.disconnect();
-          injectTriggerButton();
-        }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const hasTable = document.querySelector('.data-grid-table-ctr') || document.querySelector('[aria-rowcount]');
+      if (hasTable) {
+        clearInterval(interval);
+        injectTriggerButton();
+      }
+      if (attempts > 60) clearInterval(interval);
+    }, 1000);
   }
 
   function injectTriggerButton() {
