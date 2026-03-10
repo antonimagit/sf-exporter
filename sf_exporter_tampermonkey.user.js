@@ -115,10 +115,14 @@
       el.scrollTop = el.scrollHeight;
     }
 
-    function findScrollContainer() {
-      const ctrs = [...D.querySelectorAll('.data-grid-table-ctr')];
-      return ctrs.find(el => el.scrollHeight > el.clientHeight && el.clientHeight > 50) || null;
-    }
+      function findScrollContainer() {
+          const ctrs = [...D.querySelectorAll('.data-grid-table-ctr')];
+          return ctrs.find(el =>
+                           el.scrollHeight > el.clientHeight &&
+                           el.clientHeight > 50 &&
+                           (el.style.overflow === 'scroll' || el.style.overflowY === 'scroll')
+                          ) || null;
+      }
 
     function getTotalRows() {
       const el = D.querySelector('[aria-rowcount]');
