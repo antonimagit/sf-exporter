@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         SF Table Exporter
 // @namespace    https://antonimagit.github.io/sf-exporter/
-// @version      1.1
+// @version      1.2
 // @description  Esporta tabelle Salesforce con virtual scroll in CSV
 // @author       Antonio
 // @match        https://*.lightning.force.com/*
 // @match        https://*.salesforce.com/*
-// @grant        none
+// @grant        unsafeWindow
+// @run-at       document-idle
 // @updateURL    https://antonimagit.github.io/sf-exporter/sf_exporter_tampermonkey.user.js
 // @downloadURL  https://antonimagit.github.io/sf-exporter/sf_exporter_tampermonkey.user.js
 // ==/UserScript==
@@ -14,23 +15,24 @@
 (function () {
   'use strict';
 
-  // Aspetta che la pagina sia pronta, poi inietta il bottone trigger
+  const D = (typeof unsafeWindow !== 'undefined' && unsafeWindow.document) || document;
+
   function waitForPage() {
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const hasTable = document.querySelector('.data-grid-table-ctr') || document.querySelector('[aria-rowcount]');
+      const hasTable = D.querySelector('.data-grid-table-ctr') || D.querySelector('[aria-rowcount]');
       if (hasTable) {
         clearInterval(interval);
         injectTriggerButton();
       }
-      if (attempts > 60) clearInterval(interval);
-    }, 1000);
+      if (attempts > 120) clearInterval(interval);
+    }, 500);
   }
 
   function injectTriggerButton() {
-    if (document.getElementById('sfx-trigger')) return;
-    const btn = document.createElement('button');
+    if (D.getElementById('sfx-trigger')) return;
+    const btn = D.createElement('button');
     btn.id = 'sfx-trigger';
     btn.textContent = '⬇ Export CSV';
     btn.style.cssText = `
@@ -46,13 +48,13 @@
     btn.onmouseenter = () => { btn.style.filter = 'brightness(1.15)'; btn.style.transform = 'translateY(-2px)'; };
     btn.onmouseleave = () => { btn.style.filter = ''; btn.style.transform = ''; };
     btn.onclick = launchExporter;
-    document.body.appendChild(btn);
+    D.body.appendChild(btn);
   }
 
   function launchExporter() {
-    if (document.getElementById('sf-exporter-ui')) return;
+    if (D.getElementById('sf-exporter-ui')) return;
 
-    const ui = document.createElement('div');
+    const ui = D.createElement('div');
     ui.id = 'sf-exporter-ui';
     ui.innerHTML = `
       <style>
@@ -118,9 +120,9 @@
         <div id="sfx-log"></div>
       </div>
     `;
-    document.body.appendChild(ui);
+    D.body.appendChild(ui);
 
-    const $ = id => document.getElementById(id);
+    const $ = id => D.getElementById(id);
     $('sfx-close').onclick = () => ui.remove();
 
     function log(msg, cls) {
@@ -130,18 +132,18 @@
     }
 
     function findScrollContainer() {
-      const ctrs = [...document.querySelectorAll('.data-grid-table-ctr')];
+      const ctrs = [...D.querySelectorAll('.data-grid-table-ctr')];
       return ctrs.find(el => el.scrollHeight > el.clientHeight && el.clientHeight > 50) || null;
     }
 
     function getTotalRows() {
-      const el = document.querySelector('[aria-rowcount]');
+      const el = D.querySelector('[aria-rowcount]');
       return el ? parseInt(el.getAttribute('aria-rowcount')) : null;
     }
 
     function detectColumns() {
       const byAria = [];
-      document.querySelectorAll('.data-grid-header-row .data-grid-header-cell [aria-label]').forEach(el => {
+      D.querySelectorAll('.data-grid-header-row .data-grid-header-cell [aria-label]').forEach(el => {
         const lbl = el.getAttribute('aria-label') || '';
         const match = lbl.match(/^Header (.+?) Tooltip/);
         if (match) byAria.push(match[1]);
@@ -149,7 +151,7 @@
       if (byAria.length) return byAria;
 
       const byText = [];
-      document.querySelectorAll('.data-grid-header-row .data-grid-header-cell').forEach(el => {
+      D.querySelectorAll('.data-grid-header-row .data-grid-header-cell').forEach(el => {
         const txt = el.innerText || el.textContent || '';
         const clean = txt.trim().split('\n')[0].trim();
         if (clean) byText.push(clean);
@@ -168,7 +170,7 @@
     }
 
     function harvest(collected) {
-      document.querySelectorAll('td[data-row-index]').forEach(cell => {
+      D.querySelectorAll('td[data-row-index]').forEach(cell => {
         const rowIdx = cell.getAttribute('data-row-index');
         const colIdx = parseInt(cell.getAttribute('data-column-index'));
         if (rowIdx === null || isNaN(colIdx)) return;
@@ -191,7 +193,7 @@
         );
       const csv = headerLine + '\n' + rows.join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
+      const a = D.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'salesforce_export_' + new Date().toISOString().slice(0, 10) + '.csv';
       a.click();
@@ -248,11 +250,6 @@
     };
   }
 
-  // Avvia
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', waitForPage);
-  } else {
-    waitForPage();
-  }
+  waitForPage();
 
 })();
