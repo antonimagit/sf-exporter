@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         SF Table Exporter
 // @namespace    https://antonimagit.github.io/sf-exporter/
-// @version      1.2
+// @version      1.3
 // @description  Esporta tabelle Salesforce con virtual scroll in CSV
 // @author       Antonio
+// @match        https://ibmsc.lightning.force.com/*
 // @match        https://*.lightning.force.com/*
 // @match        https://*.salesforce.com/*
-// @grant        unsafeWindow
+// @grant        none
 // @run-at       document-idle
 // @updateURL    https://antonimagit.github.io/sf-exporter/sf_exporter_tampermonkey.user.js
 // @downloadURL  https://antonimagit.github.io/sf-exporter/sf_exporter_tampermonkey.user.js
@@ -15,18 +16,26 @@
 (function () {
   'use strict';
 
-  const D = (typeof unsafeWindow !== 'undefined' && unsafeWindow.document) || document;
+  console.log('SF Exporter v1.3 caricato in:', location.href, '| frame:', window !== window.top ? 'IFRAME' : 'TOP');
+
+  // Funziona sia nel frame top che negli iframe — inietta il bottone nel documento giusto
+  const D = document;
 
   function waitForPage() {
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
       const hasTable = D.querySelector('.data-grid-table-ctr') || D.querySelector('[aria-rowcount]');
+      if (attempts % 10 === 0) console.log('SF Exporter polling attempt', attempts, '| hasTable:', !!hasTable, '| url:', location.href);
       if (hasTable) {
         clearInterval(interval);
+        console.log('SF Exporter: tabella trovata, inietto bottone');
         injectTriggerButton();
       }
-      if (attempts > 120) clearInterval(interval);
+      if (attempts > 120) {
+        console.log('SF Exporter: polling terminato, tabella non trovata');
+        clearInterval(interval);
+      }
     }, 500);
   }
 
@@ -40,15 +49,13 @@
       padding: 10px 18px;
       background: linear-gradient(135deg, #5c6bc0, #7c85ff);
       color: #fff; border: none; border-radius: 10px;
-      font-family: 'SF Mono', monospace; font-size: 12px; font-weight: 700;
+      font-family: monospace; font-size: 12px; font-weight: 700;
       letter-spacing: .08em; cursor: pointer;
       box-shadow: 0 4px 20px rgba(124,133,255,.4);
-      transition: all .15s;
     `;
-    btn.onmouseenter = () => { btn.style.filter = 'brightness(1.15)'; btn.style.transform = 'translateY(-2px)'; };
-    btn.onmouseleave = () => { btn.style.filter = ''; btn.style.transform = ''; };
     btn.onclick = launchExporter;
     D.body.appendChild(btn);
+    console.log('SF Exporter: bottone iniettato');
   }
 
   function launchExporter() {
@@ -60,47 +67,24 @@
       <style>
         #sf-exporter-ui {
           position: fixed; top: 24px; right: 24px; z-index: 999999;
-          width: 310px;
-          background: #0f1117;
-          border: 1px solid #2a2d3a;
-          border-radius: 12px;
-          box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;
-          font-family: 'SF Mono', 'Fira Code', monospace;
-          color: #e2e8f0;
-          overflow: hidden;
-          user-select: none;
+          width: 310px; background: #0f1117; border: 1px solid #2a2d3a;
+          border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.6);
+          font-family: monospace; color: #e2e8f0; overflow: hidden; user-select: none;
         }
-        #sfx-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 16px 12px;
-          border-bottom: 1px solid #1e2130;
-          background: linear-gradient(135deg,#1a1d2e,#0f1117);
-        }
+        #sfx-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 12px; border-bottom: 1px solid #1e2130; background: linear-gradient(135deg,#1a1d2e,#0f1117); }
         #sfx-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #7c85ff; text-transform: uppercase; }
-        #sfx-close { cursor: pointer; color: #4a5068; font-size: 16px; line-height: 1; transition: color .15s; }
-        #sfx-close:hover { color: #e2e8f0; }
+        #sfx-close { cursor: pointer; color: #4a5068; font-size: 16px; line-height: 1; }
         #sfx-body { padding: 16px; }
-        #sfx-status { font-size: 12px; color: #8892b0; margin-bottom: 14px; min-height: 16px; letter-spacing: .02em; }
+        #sfx-status { font-size: 12px; color: #8892b0; margin-bottom: 14px; min-height: 16px; }
         #sfx-status span { color: #7c85ff; font-weight: 700; }
         #sfx-bar-wrap { background: #1a1d2e; border-radius: 4px; height: 6px; overflow: hidden; margin-bottom: 16px; }
-        #sfx-bar {
-          height: 100%; width: 0%;
-          background: linear-gradient(90deg, #5c6bc0, #7c85ff);
-          border-radius: 4px; transition: width .2s ease;
-          box-shadow: 0 0 8px #7c85ff88;
-        }
+        #sfx-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #5c6bc0, #7c85ff); border-radius: 4px; transition: width .2s ease; }
         #sfx-counters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
         .sfx-kpi { background: #1a1d2e; border-radius: 8px; padding: 10px 12px; border: 1px solid #2a2d3a; }
         .sfx-kpi-label { font-size: 9px; color: #4a5068; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
-        .sfx-kpi-value { font-size: 20px; font-weight: 700; color: #e2e8f0; letter-spacing: -.02em; }
-        #sfx-btn {
-          width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer;
-          font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: .1em;
-          text-transform: uppercase; transition: all .15s;
-          background: linear-gradient(135deg,#5c6bc0,#7c85ff); color: #fff;
-        }
-        #sfx-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
-        #sfx-btn:disabled { background: #2a2d3a; color: #4a5068; cursor: not-allowed; transform: none; }
+        .sfx-kpi-value { font-size: 20px; font-weight: 700; color: #e2e8f0; }
+        #sfx-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: linear-gradient(135deg,#5c6bc0,#7c85ff); color: #fff; }
+        #sfx-btn:disabled { background: #2a2d3a; color: #4a5068; cursor: not-allowed; }
         #sfx-log { margin-top: 12px; font-size: 10px; color: #4a5068; max-height: 60px; overflow-y: auto; line-height: 1.6; }
         .sfx-log-ok { color: #4ade80; }
         .sfx-log-err { color: #f87171; }
@@ -149,16 +133,13 @@
         if (match) byAria.push(match[1]);
       });
       if (byAria.length) return byAria;
-
       const byText = [];
       D.querySelectorAll('.data-grid-header-row .data-grid-header-cell').forEach(el => {
         const txt = el.innerText || el.textContent || '';
         const clean = txt.trim().split('\n')[0].trim();
         if (clean) byText.push(clean);
       });
-      if (byText.length) return byText;
-
-      return null;
+      return byText.length ? byText : null;
     }
 
     function detectNumColsFromData(collected) {
@@ -186,11 +167,7 @@
       const headerLine = resolvedHeaders.map(h => `"${h}"`).join(',');
       const rows = [...collected.entries()]
         .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-        .map(([, cols]) =>
-          Array.from({ length: numCols }, (_, i) =>
-            `"${(cols[i] || '').replace(/"/g, '""')}"`
-          ).join(',')
-        );
+        .map(([, cols]) => Array.from({ length: numCols }, (_, i) => `"${(cols[i] || '').replace(/"/g, '""')}"`).join(','));
       const csv = headerLine + '\n' + rows.join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const a = D.createElement('a');
@@ -207,16 +184,16 @@
 
       const scrollContainer = findScrollContainer();
       if (!scrollContainer) {
-        log('❌ Container non trovato. Sei sulla pagina giusta?', 'sfx-log-err');
+        log('❌ Container non trovato.', 'sfx-log-err');
         btn.disabled = false; btn.textContent = '▶ Start Export'; return;
       }
 
       const totalRows = getTotalRows();
       $('sfx-total').textContent = totalRows || '?';
-      log(`Container trovato. Righe attese: ${totalRows}`, 'sfx-log-ok');
+      log(`Container trovato. Righe: ${totalRows}`, 'sfx-log-ok');
 
       const headers = detectColumns();
-      log(`Colonne: ${headers ? headers.join(', ') : '(rilevate dai dati)'}`, '');
+      log(`Colonne: ${headers ? headers.join(', ') : '(auto)'}`, '');
 
       const collected = new Map();
       const totalHeight = scrollContainer.scrollHeight;
@@ -229,8 +206,7 @@
         await delay(300);
         harvest(collected);
         i++;
-        const pct = Math.min(100, Math.round((i / iterations) * 100));
-        $('sfx-bar').style.width = pct + '%';
+        $('sfx-bar').style.width = Math.min(100, Math.round((i / iterations) * 100)) + '%';
         $('sfx-collected').textContent = collected.size;
         $('sfx-status').innerHTML = `Scroll <span>${pos}px</span> / ${totalHeight}px`;
       }
@@ -240,11 +216,9 @@
       harvest(collected);
       $('sfx-collected').textContent = collected.size;
       $('sfx-bar').style.width = '100%';
-
-      log(`✅ Raccolte ${collected.size} righe. Download in corso...`, 'sfx-log-ok');
-      $('sfx-status').innerHTML = `Completato! <span>${collected.size}</span> righe esportate.`;
+      log(`✅ ${collected.size} righe. Download...`, 'sfx-log-ok');
+      $('sfx-status').innerHTML = `Completato! <span>${collected.size}</span> righe.`;
       downloadCSV(collected, headers);
-
       btn.textContent = '✅ Esportato!';
       setTimeout(() => { btn.disabled = false; btn.textContent = '▶ Riesporta'; }, 3000);
     };
